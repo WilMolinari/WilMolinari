@@ -1,0 +1,251 @@
+//Transmitter
+#include <SPI.h>
+#include <mcp_can.h>
+
+/*  This is a default program--
+  Use File->Load Prog to load a different program
+*/
+
+/*
+  * Entradas APPS
+  */
+int apps0 = A0;
+int apps1 = A1;
+float appsValue0;
+float appsValue1;
+float acceleration;
+
+/*
+ * Entradas BSE
+ */
+int bse = A2;
+int bseButton = 2;
+int bseValue;
+
+
+//receive parameters
+long unsigned int rxId;
+unsigned char len = 0;
+unsigned char rxBuf[8];
+char msgString[128];    //Array to store serial string (need to test the data retrieved)
+
+/*
+ * Comunicação MCP
+ * //TODO - Pesquisar se existe um porque para cada uma dessas saídas
+ * //TODO - Verificar quais são portas de entrada e saída
+    TODO NIKO
+ */
+const int spiCSPin = 10;
+#define CAN_INT 2      //Set INT to pin 2 - CAN receive route
+MCP_CAN CAN(spiCSPin);
+
+/*
+ * Comunicação DMS
+ */
+
+int dmsOut = 4;
+
+/*
+ * Comunicação CMD Central
+ */
+int cmdIn = 6;
+int cmdOut = 7;
+int cmdBseValidation = 8;
+int cmdValue;
+
+/*
+ * Headers
+ */
+float getAcceleration (int apps0, int apps 1);
+
+void setup()
+{
+  Serial.begin(115200);
+
+  pinMode(cmdIn, INPUT);
+  pinMode(cmdOut, OUTPUT);
+  pinMode(cmdBseValidation, OUTPUT);
+
+  pinMode(bseButton, INPUT);
+
+  pinMode(dmsOut, OUTPUT);
+
+  while (CAN_OK != CAN.begin(MCP_ANY, CAN_500KBPS, MCP_16MHZ)) { //TODO - Verificar modelo e frequencia da placa do CAN - NIKO
+    Serial.println("CAN BUS ERROR");
+    delay(100);
+  }
+  Serial.println("CAN BUS INIT");
+
+  CAN.setMode(MCP_NORMAL);   //Operation mode to normal, MCP2515 sends acks (confirmartion of receive) to received data
+  pinMode(CAN_INT, INPUT);
+  }
+
+int bit2byte(bool bits[8]) {
+    int arrSize = 8/sizeof(char);
+    int output = 0;
+    int y = arrSize - 1;
+    int x = 0;
+    while (x < arrSize) {
+      output |= bits[x] << y;
+      x++;
+      y--;
+    }
+    return output;
+}
+
+int getAcceleration (){
+
+  appsValue0 = analogRead(apps0);
+  appsValue1 = analogRead(apps1);
+
+  if(true /*TODO Validação NIKO*/){
+    return appsValue = analogRead(appsValue0); // appsValue 0 ~ 1023;
+  }else{
+    return appsValue = analogRead(appsValue1); // appsValue 0 ~ 1023;
+  }
+  
+  //TODO converter valores pro MCP Niko
+}
+
+int getBraking (){
+    return digitalRead(bseButton); // Return high or low
+}
+
+bool bseValidation(int breaking, int acceleration){
+    //TODO Validação BSE
+    //TODO trazer método de comunicação de BseException do cmd
+    //TODO WILL
+    return true;
+}
+
+void driveCommand(){
+    if(true /*TODO Validação Alan */ ){
+        analogWrite(dmsOut, HIGH);
+    }
+    else{
+        analogWrite(dmsOut, LOW);
+    }
+}
+
+//TODO Pensar na eficiencia - relaçao aceleracao e vel maxima;
+
+void getNrChksAct(){
+    //positions 0 ~ 7
+    for
+}
+
+void mcpCommunication (int torque, int aceleracao){
+//TODO -> Testes de velocidade de transmissão de dados // Verificar possíveis erros da parte do motor
+
+    //bool completeValue[56];
+    //TODO passagem de código para a MCP
+      bool nrChksAct[8]  = {0, 0, 0, 0, 0, 0, 0, 0};
+      bool nrAlvCntrAct[4]  = {0, 0, 0, 0};
+      bool stOperModDesEdrv[4]  = {0, 1, 1, 0}; //Speed mode for engine
+      bool tqDesEdrv[12]  = {0, 1, 0, 1, 1, 0, 1, 1, 1, 1, 1, 0}; //Max torque as 1Nm for test with no load     //TODO -> Melhoria Eficiência
+      bool tqMinEdrv[12]  = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}; //Min torque set as -200Nm
+      bool nDesEdrv[13]  = {1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 1, 1, 1}; //Speed of motor set to 1002 rpm for test   //TODO -> Conversão para valor da aceleração;
+      bool toComplete[3]  = {0, 0, 0}; //Last bits for completion of matrix
+
+      bool completeVectorSignal[56];
+
+      int i = 0;
+
+      for (i; i < 8; i++) {
+        completeVectorSignal[i] = nrChksAct[i];
+      }
+
+      for (int j = 0; i < 12; i++, j++) {
+        completeVectorSignal[i] = nrAlvCntrAct[j];
+      }
+
+      for (int j = 0; i < 16; i++, j++) {
+        completeVectorSignal[i] = nrAlvCntrAct[j];
+      }
+
+      for (int j = 0; i < 28; i++, j++) {
+        completeVectorSignal[i] = tqDesEdrv[j];
+      }
+
+      for (int j = 0; i < 53; i++, j++) {
+        completeVectorSignal[i] = nDesEdrv[j];
+      }
+
+      for (int j = 0; i < 56; i++, j++) {
+        completeVectorSignal[i] = toComplete[j];
+      }
+
+      unsigned char stmp[7];
+
+      for (int j = 0; j < 56; j += 8) {
+        bool bits[8];
+        int x = j;
+        for (int k = 0; k < 8; k++) {
+          bits[k] = completeVectorSignal[x];
+          x++;
+        }
+        stmp[j/8] = bit2byte(bits);
+      }
+
+      CAN.sendMsgBuf(0x1, 0, 7, stmp);
+      delay(1000);
+
+}
+
+bool getCommandCentralIn(){
+    //TODO verificar sinal do comando central
+    //TODO Will
+
+    return true;
+}
+
+void cmdBseValidationException(bool func){
+    if (func == false){
+        analogWrite(cmdBseValidation, LOW);
+    }else{
+        analogWrite(cmdBseValidation, HIGH);
+    }
+}
+
+void sendCmdAccelerationValue(int acceleration){
+}
+
+int getMotorValues(){
+  if (!digitalRead(CAN_INT)) {   //receive data in low
+    CAN.readMsgBuf(&rxId, &len, rxBuf);  //read data: len = data length, buf = data byte(s)
+
+    if ((rxId & 0x80000000) == 0x80000000)    //29 bits?
+      sprintf(msgString, "Standard ID: 0x%.31X  DLC: %1d Data:", (rxId & 0x1FFFFFFF), len);
+    else
+      sprintf(msgString, "Standard ID: 0x%.31X  DLC: %1d Data:", rxId, len);
+
+    if ((rxId & 0x20000000) == 0x20000000) {  //first priority message from engine (TX)
+      sprintf(msgString, "Engine response");
+      Serial.print(msgString);
+    } else {
+      for (byte i = 0; i < len; i++) {
+        sprintf(msgString, " 0x%.2X", rxBuf[i]);  //To watch how responses of engine work
+        Serial.print(msgString);                  //To watch how responses of engine work
+      }
+    }
+    Serial.println();
+  }
+}
+
+void loop(){
+    //TODO -> LOGS -> Serial.println("asdfadsfads"); Alan -> adicionar logs nos códigos
+    acceleration = getAcceleration();
+    breaking = getBraking();
+    cmdValue = getCommandCentralIn();
+    driveCommand(cmdValue, acceleration, breaking); 
+
+    if(bseValidation(acceleration, braking)){
+        mcpCommunication(acceleration);
+        sendCmdAccelerationValue(acceleration);
+
+        cmdBseValidationException(true);
+    }else{
+        cmdBseValidationException(false);
+    }
+
+}
